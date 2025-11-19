@@ -6,7 +6,7 @@
 
 ```bash
 # 查询评分
-./scripts/query-spot-score.sh us-west-2 8
+python3 scripts/query-spot-score.py us-west-2 8
 
 # 选择评分 >= 8 的实例类型
 ```
@@ -264,7 +264,7 @@ kubectl logs -n kube-system -l app.kubernetes.io/name=karpenter | grep -i "spot\
 
 ```bash
 # 每周查询一次 Spot 评分
-./scripts/query-spot-score.sh us-west-2 8
+python3 scripts/query-spot-score.py us-west-2 8
 
 # 根据结果更新 NodePool
 ./scripts/generate-nodepool.sh us-west-2 8 > nodepool-updated.yaml
@@ -434,7 +434,7 @@ watch kubectl get pods -o wide
 
 ### Q: 如何选择实例类型？
 
-A: 使用 `query-spot-score.sh` 查询评分，选择评分 >= 8 的实例类型。
+A: 使用 `query-spot-score.py` 查询评分，选择评分 >= 8 的实例类型。
 
 ### Q: Spot 中断率多少是正常的？
 

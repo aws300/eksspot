@@ -24,7 +24,7 @@ spot-ondemand-eks-nodepool/
 │   ├── nodepool-ondemand.yaml   # On-Demand NodePool
 │   └── deployment.yaml          # 示例应用
 ├── scripts/                     # 工具脚本
-│   ├── query-spot-score.sh      # 查询 Spot 评分
+│   ├── query-spot-score.py      # 查询 Spot 评分
 │   ├── generate-nodepool.sh     # 生成 NodePool 配置
 │   ├── test-failover.sh         # 测试故障转移
 │   └── test-reclaim.sh          # 测试实例回收
@@ -39,7 +39,7 @@ spot-ondemand-eks-nodepool/
 
 ```bash
 cd /home/core/spot-ondemand-eks-nodepool
-./scripts/query-spot-score.sh us-west-2 8
+python3 scripts/query-spot-score.py us-west-2 8
 ```
 
 ### 2. 部署 NodePool
@@ -82,7 +82,7 @@ kubectl get pods -l app=spot-demo -o wide
 
 | 脚本 | 功能 |
 |------|------|
-| `query-spot-score.sh` | 查询 Spot 实例评分 |
+| `query-spot-score.py` | 查询 Spot 实例评分 |
 | `generate-nodepool.sh` | 动态生成 NodePool 配置 |
 | `test-failover.sh` | 测试 Spot 完全不可用场景 |
 | `test-reclaim.sh` | 测试单个实例被回收场景 |

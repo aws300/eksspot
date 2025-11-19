@@ -247,7 +247,7 @@ kubectl logs -n kube-system -l app.kubernetes.io/name=karpenter --tail=100
 kubectl describe nodepool workload-spot
 
 # 查询 Spot 可用性
-./scripts/query-spot-score.sh us-west-2 8
+python3 scripts/query-spot-score.py us-west-2 8
 ```
 
 ### Spot 频繁中断

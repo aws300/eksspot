@@ -4,6 +4,7 @@
 
 - EKS Auto Mode 集群已创建
 - kubectl 已配置
+- Python 3 已安装
 - 具有管理员权限
 
 ## 5 分钟部署
@@ -12,16 +13,28 @@
 
 ```bash
 cd /home/core/spot-ondemand-eks-nodepool
-./scripts/query-spot-score.sh us-west-2 8
+python3 scripts/query-spot-score.py us-west-2 8
 ```
 
 **输出示例**:
 ```
-查询 us-west-2 区域评分 >= 8 的 Spot 实例类型...
-ap-east-1
-ap-northeast-1
-ap-southeast-1
+查询 us-west-2 区域的 Spot 实例评分...
+
+评分结果（评分 >= 8）:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ap-east-1: Score 9
+ap-northeast-1: Score 9
+ap-southeast-1: Score 9
 ...
+```
+
+**其他区域示例**:
+```bash
+# 查询新加坡区域
+python3 scripts/query-spot-score.py ap-southeast-1 8
+
+# 查询澳大利亚区域
+python3 scripts/query-spot-score.py ap-southeast-2 8
 ```
 
 ### 步骤 2: 部署 NodePool
@@ -133,4 +146,4 @@ kubectl logs -n kube-system -l app.kubernetes.io/name=karpenter
 
 - 增加实例类型多样性
 - 调整 On-Demand 比例
-- 查询最新 Spot 评分
+- 查询最新 Spot 评分：`python3 scripts/query-spot-score.py <region> 8`

@@ -3,6 +3,9 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
 echo "=========================================="
 echo "Spot 故障转移测试"
 echo "=========================================="
@@ -30,7 +33,7 @@ echo -e "\n[5/6] 检查节点容量类型"
 kubectl get nodes -L karpenter.sh/capacity-type,workload-type | grep -E "NAME|workload" || true
 
 echo -e "\n[6/6] 恢复 Spot NodePool"
-kubectl apply -f ../configs/nodepool-spot.yaml
+kubectl apply -f "$PROJECT_DIR/configs/nodepool-spot.yaml"
 
 echo -e "\n=========================================="
 echo "测试完成！"
