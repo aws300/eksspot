@@ -12,7 +12,7 @@
 ## 📁 项目结构
 
 ```
-spot-ondemand-eks-nodepool/
+eksspot/
 ├── README.md                    # 本文档
 ├── QUICKSTART.md                # 快速开始指南
 ├── docs/                        # 详细文档
@@ -38,7 +38,6 @@ spot-ondemand-eks-nodepool/
 ### 1. 查询 Spot 评分
 
 ```bash
-cd /home/core/spot-ondemand-eks-nodepool
 python3 scripts/query-spot-score.py us-west-2 8
 ```
 
