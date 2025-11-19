@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spot-demo
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: spot-demo
+  template:
+    metadata:
+      labels:
+        app: spot-demo
+    spec:
+      tolerations:
+        - key: workload-type
+          operator: Equal
+          value: flexible
+          effect: NoSchedule
+      nodeSelector:
+        workload-type: flexible
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: capacity-type
+                    operator: In
+                    values:
+                      - spot
+            - weight: 50
+              preference:
+                matchExpressions:
+                  - key: capacity-type
+                    operator: In
+                    values:
+                      - ondemand
+      containers:
+        - name: app
+          image: 867344450900.dkr.ecr.us-west-2.amazonaws.com/aws300/test:spot-demo-v1
+          ports:
+            - containerPort: 8080
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: CAPACITY_TYPE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['capacity-type']
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spot-demo
+  namespace: default
+spec:
+  selector:
+    app: spot-demo
+  ports:
+    - port: 80
+      targetPort: 8080
+  type: ClusterIP
