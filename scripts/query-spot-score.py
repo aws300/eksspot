@@ -4,6 +4,7 @@
 import sys
 import json
 import boto3
+import time
 from botocore.exceptions import ClientError
 
 def get_instance_types(region, min_size="2xlarge", max_size="12xlarge", x86_only=True, exclude_metal=True, exclude_gpu=True):
@@ -80,7 +81,7 @@ def get_instance_types(region, min_size="2xlarge", max_size="12xlarge", x86_only
         print(f"❌ 查询实例类型失败: {str(e)}")
         return []
 
-def query_spot_scores(region, min_score=8, min_size="2xlarge", max_size="12xlarge", x86_only=True):
+def query_spot_scores(region, min_score=8, min_size="2xlarge", max_size="12xlarge", x86_only=True, interval_ms=0):
     """查询 Spot 实例评分"""
     
     print(f"查询 {region} 区域的 Spot 实例评分...")
@@ -102,6 +103,15 @@ def query_spot_scores(region, min_score=8, min_size="2xlarge", max_size="12xlarg
         return False
     
     print(f"找到 {len(instance_types)} 个符合条件的实例类型:")
+    print("━" * 80)
+    for i, instance_type in enumerate(instance_types, 1):
+        print(f"{i:3d}. {instance_type}")
+    print("━" * 80)
+    print()
+    
+    print("开始查询 Spot 评分...")
+    if interval_ms > 0:
+        print(f"查询间隔: {interval_ms}ms")
     print("━" * 80)
     
     # 查询每个实例类型的评分并显示
@@ -148,6 +158,10 @@ def query_spot_scores(region, min_score=8, min_size="2xlarge", max_size="12xlarg
         })
         
         print(f"{i:3d}. {instance_type:20} Score: {score}")
+        
+        # 添加时间间隔
+        if interval_ms > 0 and i < len(instance_types):
+            time.sleep(interval_ms / 1000.0)
     
     print("━" * 80)
     
@@ -182,8 +196,8 @@ def main():
     """主函数"""
     # 解析参数
     if len(sys.argv) < 2:
-        print("用法: python3 query-spot-score.py <region> [min_score] [min_size] [max_size] [x86_only]")
-        print("示例: python3 query-spot-score.py ap-southeast-2 3 2xlarge 12xlarge true")
+        print("用法: python3 query-spot-score.py <region> [min_score] [min_size] [max_size] [x86_only] [interval_ms]")
+        print("示例: python3 query-spot-score.py ap-southeast-2 3 2xlarge 12xlarge true 500")
         sys.exit(1)
     
     region = sys.argv[1]
@@ -191,9 +205,10 @@ def main():
     min_size = sys.argv[3] if len(sys.argv) > 3 else "2xlarge"
     max_size = sys.argv[4] if len(sys.argv) > 4 else "12xlarge"
     x86_only = sys.argv[5].lower() == 'true' if len(sys.argv) > 5 else True
+    interval_ms = int(sys.argv[6]) if len(sys.argv) > 6 else 0
     
     # 查询评分
-    success = query_spot_scores(region, min_score, min_size, max_size, x86_only)
+    success = query_spot_scores(region, min_score, min_size, max_size, x86_only, interval_ms)
     
     sys.exit(0 if success else 1)
 
