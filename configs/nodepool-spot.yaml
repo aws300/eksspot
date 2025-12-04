@@ -24,20 +24,15 @@ spec:
           operator: In
           values:
             - spot
-        - key: eks.amazonaws.com/instance-category
+        - key: node.kubernetes.io/instance-type
           operator: In
           values:
-            - c
-            - m
-            - r
-        - key: eks.amazonaws.com/instance-generation
-          operator: Gt
-          values:
-            - "5"
-        - key: kubernetes.io/arch
+            - c7i.2xlarge
+            - c8a.2xlarge
+        - key: kubernetes.io/os
           operator: In
           values:
-            - amd64
+            - linux
       taints:
         - key: workload-type
           value: flexible
