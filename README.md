@@ -38,7 +38,42 @@ eksspot/
 ### 1. 查询 Spot 评分
 
 ```bash
-python3 scripts/query-spot-score.py us-west-2 8
+# 基本用法 (默认: ap-southeast-2, 评分>=8, 2xlarge-12xlarge, x86架构)
+python3 scripts/query-spot-score.py ap-southeast-2
+
+# 自定义参数
+python3 scripts/query-spot-score.py <region> [min_score] [min_size] [max_size] [x86_only]
+
+# 示例: 查询 2xlarge-4xlarge x86 实例，评分>=3
+python3 scripts/query-spot-score.py ap-southeast-2 3 2xlarge 4xlarge true
+
+# 示例: 包含 ARM 架构，评分>=1
+python3 scripts/query-spot-score.py us-west-2 1 2xlarge 8xlarge false
+```
+
+**参数说明**:
+- `region`: AWS 区域 (必需)
+- `min_score`: 最低评分阈值 (默认: 8)
+- `min_size`: 最小实例规格 (默认: 2xlarge)
+- `max_size`: 最大实例规格 (默认: 12xlarge)
+- `x86_only`: 是否只包含 x86 架构 (默认: true)
+
+**输出示例**:
+```
+找到 13 个符合条件的实例类型:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  1. c4.4xlarge           Score: 3
+  2. c5n.2xlarge          Score: 3
+  3. c6i.4xlarge          Score: N/A
+  4. m5a.2xlarge          Score: N/A
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+在 ap-southeast-2 区域的高评分实例类型（评分 >= 3）:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+c4.4xlarge      Score:  3
+c5n.2xlarge     Score:  3
+
+共找到 2 个高评分实例类型
 ```
 
 ### 2. 部署 NodePool

@@ -6,7 +6,67 @@ import json
 import boto3
 from botocore.exceptions import ClientError
 
-def query_spot_scores(region, min_score=8):
+def get_instance_types(region, min_size="2xlarge", max_size="12xlarge", x86_only=True, exclude_metal=True, exclude_gpu=True):
+    """动态查询符合条件的实例类型"""
+    
+    print(f"正在查询 {region} 区域的实例类型...")
+    
+    # 创建 EC2 客户端
+    ec2 = boto3.client('ec2', region_name=region)
+    
+    # 定义尺寸映射 - 修复尺寸过滤bug
+    size_order = ["nano", "micro", "small", "medium", "large", "xlarge", "2xlarge", "4xlarge", 
+                  "6xlarge", "8xlarge", "12xlarge", "16xlarge", "24xlarge", "32xlarge", "48xlarge", "metal"]
+    
+    min_idx = size_order.index(min_size) if min_size in size_order else 0
+    max_idx = size_order.index(max_size) if max_size in size_order else len(size_order) - 1
+    
+    valid_sizes = size_order[min_idx:max_idx + 1]
+    
+    try:
+        # 查询所有实例类型
+        response = ec2.describe_instance_types()
+        instance_types = []
+        
+        for instance in response['InstanceTypes']:
+            instance_type = instance['InstanceType']
+            
+            # 过滤 C, M, R, T 系列
+            if not any(instance_type.startswith(prefix) for prefix in ['c', 'm', 'r', 't']):
+                continue
+            
+            # 过滤尺寸 - 修复尺寸匹配bug
+            size = instance_type.split('.')[-1]
+            # 处理特殊情况如 metal-24xl
+            if 'metal' in size:
+                size = 'metal'
+            if size not in valid_sizes:
+                continue
+            
+            # 过滤 metal
+            if exclude_metal and 'metal' in size:
+                continue
+            
+            # 过滤架构
+            if x86_only:
+                arch = instance.get('ProcessorInfo', {}).get('SupportedArchitectures', [])
+                if 'x86_64' not in arch:
+                    continue
+            
+            # 过滤 GPU
+            if exclude_gpu and instance.get('GpuInfo') is not None:
+                continue
+            
+            instance_types.append(instance_type)
+        
+        instance_types.sort()
+        return instance_types
+        
+    except Exception as e:
+        print(f"❌ 查询实例类型失败: {str(e)}")
+        return []
+
+def query_spot_scores(region, min_score=8, min_size="2xlarge", max_size="12xlarge", x86_only=True):
     """查询 Spot 实例评分"""
     
     print(f"查询 {region} 区域的 Spot 实例评分...")
@@ -20,79 +80,106 @@ def query_spot_scores(region, min_score=8):
         print(f"   {str(e)}")
         return False
     
-    # 定义实例类型
-    instance_types = [
-        "m5.large", "m5.xlarge", "m5.2xlarge", "m5.4xlarge",
-        "c5.large", "c5.xlarge", "c5.2xlarge", "c5.4xlarge",
-        "r5.large", "r5.xlarge", "r5.2xlarge", "r5.4xlarge",
-        "m6i.large", "m6i.xlarge", "m6i.2xlarge",
-        "c6i.large", "c6i.xlarge", "c6i.2xlarge",
-        "r6i.large", "r6i.xlarge", "r6i.2xlarge"
-    ]
+    # 动态获取实例类型
+    instance_types = get_instance_types(region, min_size, max_size, x86_only)
     
-    try:
-        # 调用 API
-        response = ec2.get_spot_placement_scores(
-            InstanceTypes=instance_types,
-            TargetCapacity=1,
-            SingleAvailabilityZone=False
-        )
+    if not instance_types:
+        print("❌ 没有找到符合条件的实例类型")
+        return False
+    
+    print(f"找到 {len(instance_types)} 个符合条件的实例类型:")
+    print("━" * 80)
+    
+    # 查询每个实例类型的评分并显示
+    all_results = []
+    api_errors = 0
+    
+    for i, instance_type in enumerate(instance_types, 1):
+        score = "N/A"
+        try:
+            response = ec2.get_spot_placement_scores(
+                InstanceTypes=[instance_type],
+                TargetCapacity=1,
+                SingleAvailabilityZone=False,
+                TargetCapacityUnitType='units'
+            )
+            
+            scores = response.get('SpotPlacementScores', [])
+            # 查找当前区域的评分
+            for score_item in scores:
+                if score_item.get('Region') == region:
+                    score = score_item.get('Score', "N/A")
+                    break
+            # 如果没有找到当前区域，尝试查找任何有效评分
+            if score == "N/A" and scores:
+                for score_item in scores:
+                    if score_item.get('Score') is not None:
+                        score = score_item.get('Score')
+                        break
+                        
+        except ClientError as e:
+            api_errors += 1
+            if "MaxConfigLimitExceeded" in str(e):
+                score = "LIMIT"
+            elif "Unsupported" in str(e) or "InvalidInstanceType" in str(e):
+                score = "UNSUPPORTED"
+        except Exception as e:
+            api_errors += 1
+            score = "ERROR"
         
-        # 过滤评分
-        scores = response.get('SpotPlacementScores', [])
-        high_scores = [s for s in scores if s.get('Score', 0) >= min_score]
+        all_results.append({
+            'InstanceType': instance_type,
+            'Score': score,
+            'Region': region
+        })
         
-        if not high_scores:
-            print(f"⚠️  没有找到评分 >= {min_score} 的区域")
-            print()
-            return True
-        
-        # 排序并显示
-        high_scores.sort(key=lambda x: x.get('Score', 0), reverse=True)
-        
-        print(f"评分结果（评分 >= {min_score}）:")
-        print("━" * 40)
-        for item in high_scores[:20]:
-            region_name = item.get('Region', 'Unknown')
-            score = item.get('Score', 0)
-            print(f"{region_name}: Score {score}")
-        
+        print(f"{i:3d}. {instance_type:20} Score: {score}")
+    
+    print("━" * 80)
+    
+    if api_errors > 0:
+        print(f"⚠️  {api_errors} 个实例类型查询失败 (API限制或不支持)")
+    
+    print()
+    
+    # 过滤高评分实例
+    results = [r for r in all_results if isinstance(r['Score'], int) and r['Score'] >= min_score]
+    
+    if not results:
+        print(f"⚠️  在 {region} 区域没有找到评分 >= {min_score} 的实例类型")
         print()
-        print(f"查询的实例类型: {', '.join(instance_types[:6])}...")
         return True
-        
-    except ClientError as e:
-        error_code = e.response['Error']['Code']
-        error_msg = e.response['Error']['Message']
-        
-        print(f"⚠️  无法查询该区域的 Spot 评分")
-        print()
-        print("可能的原因:")
-        print("1. 该区域不支持指定的实例类型")
-        print("2. 该区域不支持 Spot Placement Score API")
-        print()
-        print("替代方案:")
-        print("1. 使用集群内的 Spot 评分查询服务:")
-        print("   kubectl run test-curl --image=curlimages/curl:latest --rm -it --restart=Never -- \\")
-        print("     curl -s http://spot-score-checker.default.svc.cluster.local/scores")
-        print()
-        print("2. 尝试其他区域（如 us-west-2, us-east-1, eu-west-1）")
-        print()
-        print(f"错误详情: {error_code} - {error_msg}")
-        return False
     
-    except Exception as e:
-        print(f"❌ 未知错误: {str(e)}")
-        return False
+    # 排序并显示高评分实例
+    results.sort(key=lambda x: x.get('Score', 0), reverse=True)
+    
+    print(f"在 {region} 区域的高评分实例类型（评分 >= {min_score}）:")
+    print("━" * 50)
+    for item in results:
+        instance_type = item.get('InstanceType', 'Unknown')
+        score = item.get('Score', 0)
+        print(f"{instance_type:15} Score: {score:2d}")
+    
+    print()
+    print(f"共找到 {len(results)} 个高评分实例类型")
+    return True
 
 def main():
     """主函数"""
     # 解析参数
-    region = sys.argv[1] if len(sys.argv) > 1 else "us-west-2"
+    if len(sys.argv) < 2:
+        print("用法: python3 query-spot-score.py <region> [min_score] [min_size] [max_size] [x86_only]")
+        print("示例: python3 query-spot-score.py ap-southeast-2 3 2xlarge 12xlarge true")
+        sys.exit(1)
+    
+    region = sys.argv[1]
     min_score = int(sys.argv[2]) if len(sys.argv) > 2 else 8
+    min_size = sys.argv[3] if len(sys.argv) > 3 else "2xlarge"
+    max_size = sys.argv[4] if len(sys.argv) > 4 else "12xlarge"
+    x86_only = sys.argv[5].lower() == 'true' if len(sys.argv) > 5 else True
     
     # 查询评分
-    success = query_spot_scores(region, min_score)
+    success = query_spot_scores(region, min_score, min_size, max_size, x86_only)
     
     sys.exit(0 if success else 1)
 
