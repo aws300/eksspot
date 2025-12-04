@@ -24,7 +24,8 @@ eksspot/
 │   ├── nodepool-ondemand.yaml   # On-Demand NodePool
 │   └── deployment.yaml          # 示例应用
 ├── scripts/                     # 工具脚本
-│   ├── query-spot-score.py      # 查询 Spot 评分
+│   ├── query-spot-score.py      # 批量查询 Spot 评分
+│   ├── query-single-spot-score.py # 查询单个实例类型评分
 │   ├── generate-nodepool.sh     # 生成 NodePool 配置
 │   ├── test-failover.sh         # 测试故障转移
 │   └── test-reclaim.sh          # 测试实例回收
@@ -37,18 +38,20 @@ eksspot/
 
 ### 1. 查询 Spot 评分
 
+#### 批量查询多个实例类型
+
 ```bash
 # 基本用法 (默认: ap-southeast-2, 评分>=8, 2xlarge-12xlarge, x86架构)
 python3 scripts/query-spot-score.py ap-southeast-2
 
 # 自定义参数
-python3 scripts/query-spot-score.py <region> [min_score] [min_size] [max_size] [x86_only]
+python3 scripts/query-spot-score.py <region> [min_score] [min_size] [max_size] [x86_only] [interval_ms]
 
 # 示例: 查询 2xlarge-4xlarge x86 实例，评分>=3
 python3 scripts/query-spot-score.py ap-southeast-2 3 2xlarge 4xlarge true
 
-# 示例: 包含 ARM 架构，评分>=1
-python3 scripts/query-spot-score.py us-west-2 1 2xlarge 8xlarge false
+# 示例: 包含 ARM 架构，评分>=1，查询间隔500ms
+python3 scripts/query-spot-score.py us-west-2 1 2xlarge 8xlarge false 500
 ```
 
 **参数说明**:
@@ -57,16 +60,35 @@ python3 scripts/query-spot-score.py us-west-2 1 2xlarge 8xlarge false
 - `min_size`: 最小实例规格 (默认: 2xlarge)
 - `max_size`: 最大实例规格 (默认: 12xlarge)
 - `x86_only`: 是否只包含 x86 架构 (默认: true)
+- `interval_ms`: 查询间隔毫秒数 (默认: 0)
+
+#### 查询单个实例类型
+
+```bash
+# 查询单个实例类型的全球 Spot 评分
+python3 scripts/query-single-spot-score.py <region> <instance_type>
+
+# 示例: 查询 c5n.4xlarge 在 ap-southeast-2 的评分
+python3 scripts/query-single-spot-score.py ap-southeast-2 c5n.4xlarge
+
+# 示例: 查询 m5.2xlarge 在 us-west-2 的评分
+python3 scripts/query-single-spot-score.py us-west-2 m5.2xlarge
+```
 
 **输出示例**:
 ```
 找到 13 个符合条件的实例类型:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  1. c4.4xlarge
+  2. c5n.2xlarge
+  3. c6i.4xlarge
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+开始查询 Spot 评分...
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   1. c4.4xlarge           Score: 3
   2. c5n.2xlarge          Score: 3
   3. c6i.4xlarge          Score: N/A
-  4. m5a.2xlarge          Score: N/A
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 在 ap-southeast-2 区域的高评分实例类型（评分 >= 3）:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -116,7 +138,8 @@ kubectl get pods -l app=spot-demo -o wide
 
 | 脚本 | 功能 |
 |------|------|
-| `query-spot-score.py` | 查询 Spot 实例评分 |
+| `query-spot-score.py` | 批量查询 Spot 实例评分 |
+| `query-single-spot-score.py` | 查询单个实例类型的全球 Spot 评分 |
 | `generate-nodepool.sh` | 动态生成 NodePool 配置 |
 | `test-failover.sh` | 测试 Spot 完全不可用场景 |
 | `test-reclaim.sh` | 测试单个实例被回收场景 |
