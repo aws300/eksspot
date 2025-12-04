@@ -24,11 +24,25 @@ def get_instance_types(region, min_size="2xlarge", max_size="12xlarge", x86_only
     valid_sizes = size_order[min_idx:max_idx + 1]
     
     try:
-        # 查询所有实例类型
-        response = ec2.describe_instance_types()
+        # 查询所有实例类型 - 修复分页问题
+        all_instances = []
+        next_token = None
+        
+        while True:
+            if next_token:
+                response = ec2.describe_instance_types(NextToken=next_token)
+            else:
+                response = ec2.describe_instance_types()
+            
+            all_instances.extend(response['InstanceTypes'])
+            
+            if 'NextToken' not in response:
+                break
+            next_token = response['NextToken']
+        
         instance_types = []
         
-        for instance in response['InstanceTypes']:
+        for instance in all_instances:
             instance_type = instance['InstanceType']
             
             # 过滤 C, M, R, T 系列
