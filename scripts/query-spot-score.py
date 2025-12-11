@@ -7,7 +7,14 @@ import boto3
 import time
 from botocore.exceptions import ClientError
 
-def get_instance_types(region, min_size="2xlarge", max_size="12xlarge", x86_only=True, exclude_metal=True, exclude_gpu=True):
+def extract_generation(instance_type):
+    """提取实例类型的代数"""
+    # 例如: c5.2xlarge -> 5, m6i.4xlarge -> 6, r7g.large -> 7
+    import re
+    match = re.match(r'[cmrt](\d+)', instance_type)
+    return int(match.group(1)) if match else 0
+
+def get_instance_types(region, min_size="2xlarge", max_size="12xlarge", x86_only=True, exclude_metal=True, exclude_gpu=True, min_generation=5, instance_families="cmrt"):
     """动态查询符合条件的实例类型"""
     
     print(f"正在查询 {region} 区域的实例类型...")
@@ -46,8 +53,13 @@ def get_instance_types(region, min_size="2xlarge", max_size="12xlarge", x86_only
         for instance in all_instances:
             instance_type = instance['InstanceType']
             
-            # 过滤 C, M, R, T 系列
-            if not any(instance_type.startswith(prefix) for prefix in ['c', 'm', 'r', 't']):
+            # 过滤实例系列
+            if not any(instance_type.startswith(prefix) for prefix in instance_families.lower()):
+                continue
+            
+            # 过滤机器代数
+            generation = extract_generation(instance_type)
+            if generation < min_generation:
                 continue
             
             # 过滤尺寸 - 修复尺寸匹配bug
@@ -81,7 +93,7 @@ def get_instance_types(region, min_size="2xlarge", max_size="12xlarge", x86_only
         print(f"❌ 查询实例类型失败: {str(e)}")
         return []
 
-def query_spot_scores(region, min_score=8, min_size="2xlarge", max_size="12xlarge", x86_only=True, interval_ms=0):
+def query_spot_scores(region, min_score=8, min_size="2xlarge", max_size="12xlarge", x86_only=True, interval_ms=0, min_generation=5, instance_families="cmrt"):
     """查询 Spot 实例评分"""
     
     print(f"查询 {region} 区域的 Spot 实例评分...")
@@ -96,7 +108,7 @@ def query_spot_scores(region, min_score=8, min_size="2xlarge", max_size="12xlarg
         return False
     
     # 动态获取实例类型
-    instance_types = get_instance_types(region, min_size, max_size, x86_only)
+    instance_types = get_instance_types(region, min_size, max_size, x86_only, min_generation=min_generation, instance_families=instance_families)
     
     if not instance_types:
         print("❌ 没有找到符合条件的实例类型")
@@ -196,8 +208,9 @@ def main():
     """主函数"""
     # 解析参数
     if len(sys.argv) < 2:
-        print("用法: python3 query-spot-score.py <region> [min_score] [min_size] [max_size] [x86_only] [interval_ms]")
-        print("示例: python3 query-spot-score.py ap-southeast-2 3 2xlarge 12xlarge true 500")
+        print("用法: python3 query-spot-score.py <region> [min_score] [min_size] [max_size] [x86_only] [interval_ms] [min_generation] [instance_families]")
+        print("示例: python3 query-spot-score.py ap-southeast-2 3 2xlarge 12xlarge true 500 6 c")
+        print("实例系列: c(计算优化) m(通用) r(内存优化) t(突发性能) 或组合如 cm")
         sys.exit(1)
     
     region = sys.argv[1]
@@ -206,9 +219,11 @@ def main():
     max_size = sys.argv[4] if len(sys.argv) > 4 else "12xlarge"
     x86_only = sys.argv[5].lower() == 'true' if len(sys.argv) > 5 else True
     interval_ms = int(sys.argv[6]) if len(sys.argv) > 6 else 0
+    min_generation = int(sys.argv[7]) if len(sys.argv) > 7 else 5
+    instance_families = sys.argv[8] if len(sys.argv) > 8 else "cmrt"
     
     # 查询评分
-    success = query_spot_scores(region, min_score, min_size, max_size, x86_only, interval_ms)
+    success = query_spot_scores(region, min_score, min_size, max_size, x86_only, interval_ms, min_generation, instance_families)
     
     sys.exit(0 if success else 1)
 

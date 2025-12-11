@@ -41,17 +41,20 @@ eksspot/
 #### 批量查询多个实例类型
 
 ```bash
-# 基本用法 (默认: ap-southeast-2, 评分>=8, 2xlarge-12xlarge, x86架构)
+# 基本用法 (默认: ap-southeast-2, 评分>=8, 2xlarge-12xlarge, x86架构, 5代及以上, CMRT系列)
 python3 scripts/query-spot-score.py ap-southeast-2
 
 # 自定义参数
-python3 scripts/query-spot-score.py <region> [min_score] [min_size] [max_size] [x86_only] [interval_ms]
+python3 scripts/query-spot-score.py <region> [min_score] [min_size] [max_size] [x86_only] [interval_ms] [min_generation] [instance_families]
 
-# 示例: 查询 2xlarge-4xlarge x86 实例，评分>=3
-python3 scripts/query-spot-score.py ap-southeast-2 3 2xlarge 4xlarge true
+# 示例: 只查询C系列实例，评分>=3，6代及以上
+python3 scripts/query-spot-score.py ap-southeast-2 3 2xlarge 4xlarge true 0 6 c
 
-# 示例: 包含 ARM 架构，评分>=1，查询间隔500ms
-python3 scripts/query-spot-score.py us-west-2 1 2xlarge 8xlarge false 500
+# 示例: 只查询M和R系列，评分>=1，查询间隔500ms，5代及以上
+python3 scripts/query-spot-score.py us-west-2 1 2xlarge 8xlarge false 500 5 mr
+
+# 示例: 只查询计算优化C系列，ARM架构也包含
+python3 scripts/query-spot-score.py us-west-2 8 2xlarge 8xlarge false 0 6 c
 ```
 
 **参数说明**:
@@ -61,6 +64,13 @@ python3 scripts/query-spot-score.py us-west-2 1 2xlarge 8xlarge false 500
 - `max_size`: 最大实例规格 (默认: 12xlarge)
 - `x86_only`: 是否只包含 x86 架构 (默认: true)
 - `interval_ms`: 查询间隔毫秒数 (默认: 0)
+- `min_generation`: 最低机器代数 (默认: 5)
+- `instance_families`: 实例系列过滤 (默认: cmrt)
+  - `c`: 计算优化 (C5, C6i 等)
+  - `m`: 通用型 (M5, M6i 等)
+  - `r`: 内存优化 (R5, R6i 等)
+  - `t`: 突发性能 (T3, T4g 等)
+  - 可组合使用: `cm` (C+M系列), `mr` (M+R系列)
 
 #### 查询单个实例类型
 
